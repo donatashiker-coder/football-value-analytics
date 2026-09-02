@@ -46,6 +46,11 @@ def status(db: Session = Depends(get_db)):
     }
 
 
+def _last_error(db: Session, provider: str) -> str | None:
+    """Most recent provider error text (status body excerpt; endpoints are logged without query params, so no keys)."""
+    return db.scalar(select(ApiRequest.error).where(ApiRequest.provider == provider, ApiRequest.error.isnot(None)).order_by(ApiRequest.created_at.desc()).limit(1))
+
+
 @router.get("/data-health")
 def data_health(db: Session = Depends(get_db)):
     now = datetime.now(UTC)
@@ -68,7 +73,7 @@ def data_health(db: Session = Depends(get_db)):
         "last_odds_update": last_odds.isoformat() if last_odds else None,
         "odds_age_hours": odds_age,
         "last_fixture_update": last_fixture_update.isoformat() if last_fixture_update else None,
-        "api_requests_24h": [{"provider": p, "requests": n, "cached": int(c or 0), "errors": e} for p, n, c, e in recent_requests],
+        "api_requests_24h": [{"provider": p, "requests": n, "cached": int(c or 0), "errors": e, "last_error": _last_error(db, p) if e else None} for p, n, c, e in recent_requests],
         "warnings": warnings,
     }
 

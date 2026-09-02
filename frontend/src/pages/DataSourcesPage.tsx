@@ -96,6 +96,7 @@ export default function DataSourcesPage() {
                         <th className="text-right">Requests</th>
                         <th className="text-right">Cached</th>
                         <th className="text-right">Errors</th>
+                        <th>Last error</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -105,6 +106,7 @@ export default function DataSourcesPage() {
                           <td className="text-right num">{r.requests}</td>
                           <td className="text-right num">{r.cached}</td>
                           <td className={`text-right num ${r.errors > 0 ? 'text-red-700 dark:text-red-300' : ''}`}>{r.errors}</td>
+                          <td className="max-w-md break-words muted">{r.last_error ?? '—'}</td>
                         </tr>
                       ))}
                     </tbody>

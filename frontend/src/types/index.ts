@@ -35,6 +35,7 @@ export interface ApiRequestStat {
   requests: number
   cached: number
   errors: number
+  last_error: string | null
 }
 
 export interface DataHealth {
