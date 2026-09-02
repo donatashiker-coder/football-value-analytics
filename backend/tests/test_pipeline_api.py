@@ -167,3 +167,25 @@ def test_model_evaluation_after_settlement(client, db):
     assert model_leaderboard(db)
     assert client.get("/api/performance").json()["performance"]["n"] > 0
     assert client.get("/api/models/leaderboard").json()
+
+
+def test_provider_quota_is_recorded_from_response_headers(client, db_session_factory):
+    """The Odds API reports credits in x-requests-remaining/used; the client stores them and
+    /api/data-sources shows the numbers exactly as reported."""
+    import asyncio
+
+    import httpx
+
+    from app.providers.http import CachedHttpClient
+    from app.services.settings_service import all_settings, provider_quotas
+
+    http = CachedHttpClient("the_odds_api", "https://example.test/v4", default_ttl=0, session_factory=db_session_factory, quota_headers=("x-requests-remaining", "x-requests-used"))
+    http.transport = httpx.MockTransport(lambda req: httpx.Response(200, json=[], headers={"x-requests-remaining": "437", "x-requests-used": "63"}))
+    assert asyncio.run(http.get_json("sports", use_cache=False)) == []
+
+    with db_session_factory() as db:
+        q = provider_quotas(db)["the_odds_api"]
+        assert (q["remaining"], q["used"]) == (437, 63) and q["updated_at"]
+        assert "_provider_quota" not in all_settings(db)  # internal state is not an editable setting
+    odds = next(p for p in client.get("/api/data-sources").json()["providers"] if p["key"] == "the_odds_api")
+    assert odds["quota"]["remaining"] == 437 and odds["quota"]["used"] == 63

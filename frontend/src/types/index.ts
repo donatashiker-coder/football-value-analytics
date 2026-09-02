@@ -816,6 +816,12 @@ export interface SettingsResponse {
 
 // ---- Data sources ----------------------------------------------------------
 
+export interface ProviderQuota {
+  remaining: number | null
+  used: number | null
+  updated_at: string
+}
+
 export interface ProviderInfo {
   key: string
   name: string
@@ -824,6 +830,7 @@ export interface ProviderInfo {
   active: boolean
   fields: string[]
   notes: string | null
+  quota?: ProviderQuota | null
 }
 
 export interface DataSourceLeague {

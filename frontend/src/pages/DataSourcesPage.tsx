@@ -44,6 +44,15 @@ export default function DataSourcesPage() {
                     </div>
                   )}
                   {p.notes && <p className="mt-2 text-xs muted">{p.notes}</p>}
+                  {p.quota && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className={`chip ${p.quota.remaining !== null && p.quota.remaining < 50 ? 'chip-yellow' : 'chip-green'}`}>
+                        {p.quota.remaining !== null ? `${p.quota.remaining} credits left` : 'credits: DATA UNAVAILABLE'}
+                      </span>
+                      {p.quota.used !== null && <span className="muted">{p.quota.used} used this period</span>}
+                      <span className="muted">as of {localDateTime(p.quota.updated_at)}</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

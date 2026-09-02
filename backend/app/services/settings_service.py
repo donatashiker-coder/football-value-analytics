@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -49,9 +50,31 @@ def set_setting(db: Session, key: str, value: dict) -> dict:
 def all_settings(db: Session) -> dict[str, dict]:
     out = {k: get_setting(db, k) for k in DEFAULTS}
     for row in db.scalars(select(SystemSetting)):
-        if row.key not in out:
+        if row.key not in out and not row.key.startswith("_"):  # "_" keys are internal state, not user settings
             out[row.key] = row.value
     return out
+
+
+# ---- provider quota (internal state, keyed "_provider_quota") -------------------------------------
+QUOTA_KEY = "_provider_quota"
+
+
+def record_provider_quota(db: Session, provider: str, remaining: int | None, used: int | None) -> None:
+    """Store the latest quota numbers a provider reported in its response headers (e.g. The Odds API's
+    x-requests-remaining / x-requests-used). Numbers are copied from the provider, never estimated."""
+    row = db.get(SystemSetting, QUOTA_KEY)
+    value = dict(row.value or {}) if row is not None else {}
+    value[provider] = {"remaining": remaining, "used": used, "updated_at": datetime.now(UTC).isoformat()}
+    if row is None:
+        db.add(SystemSetting(key=QUOTA_KEY, value=value, description="Latest provider quota reported by the providers"))
+    else:
+        row.value = value
+    db.commit()
+
+
+def provider_quotas(db: Session) -> dict[str, dict]:
+    row = db.get(SystemSetting, QUOTA_KEY)
+    return dict(row.value or {}) if row is not None else {}
 
 
 def value_config(db: Session) -> ValueConfig:

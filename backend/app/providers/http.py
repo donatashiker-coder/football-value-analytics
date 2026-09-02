@@ -33,7 +33,9 @@ class RateLimited(Exception):
 
 
 class CachedHttpClient:
-    def __init__(self, provider: str, base_url: str, headers: dict[str, str] | None = None, default_ttl: int = 3600, session_factory: Callable | None = None):
+    def __init__(self, provider: str, base_url: str, headers: dict[str, str] | None = None, default_ttl: int = 3600, session_factory: Callable | None = None, quota_headers: tuple[str, str] | None = None):
+        """`quota_headers` = (remaining-header, used-header): when the provider reports its quota in response
+        headers, the latest values are persisted (see settings_service.record_provider_quota)."""
         s = get_settings()
         self.provider = provider
         self.base_url = base_url.rstrip("/")
@@ -44,6 +46,8 @@ class CachedHttpClient:
         self.timeout = s.http_timeout_seconds
         self.max_retries = s.http_max_retries
         self.session_factory = session_factory
+        self.quota_headers = quota_headers
+        self.transport: httpx.AsyncBaseTransport | None = None  # tests inject httpx.MockTransport
         self._sem = asyncio.Semaphore(4)
 
     # ---- cache -------------------------------------------------------
@@ -83,6 +87,27 @@ class CachedHttpClient:
         except Exception as exc:  # pragma: no cover - logging must never break a request
             log.debug("api request log failed: %s", exc)
 
+    def _record_quota(self, headers: httpx.Headers) -> None:
+        if self.quota_headers is None or self.session_factory is None:
+            return
+        remaining_h, used_h = self.quota_headers
+        if remaining_h not in headers and used_h not in headers:
+            return
+
+        def _int(name: str) -> int | None:
+            try:
+                return int(float(headers[name])) if name in headers else None
+            except ValueError:
+                return None
+
+        try:
+            from app.services.settings_service import record_provider_quota
+
+            with self.session_factory() as db:
+                record_provider_quota(db, self.provider, _int(remaining_h), _int(used_h))
+        except Exception as exc:  # pragma: no cover - bookkeeping must never break a request
+            log.debug("quota record failed: %s", exc)
+
     # ---- request -----------------------------------------------------
     async def get_json(self, path: str, params: dict | None = None, ttl: int | None = None, use_cache: bool = True) -> Any:
         ttl = self.default_ttl if ttl is None else ttl
@@ -112,9 +137,10 @@ class CachedHttpClient:
     async def _get_with_retry(self, path: str, params: dict | None) -> Any:
         url = f"{self.base_url}/{path.lstrip('/')}"
         started = time.perf_counter()
-        async with self._sem, httpx.AsyncClient(timeout=self.timeout, headers=self.headers) as client:
+        async with self._sem, httpx.AsyncClient(timeout=self.timeout, headers=self.headers, transport=self.transport) as client:
             resp = await client.get(url, params=params)
         duration = (time.perf_counter() - started) * 1000
+        self._record_quota(resp.headers)
         if resp.status_code == 429:
             retry_after = float(resp.headers.get("Retry-After", "5") or 5)
             log.warning("%s rate limited on %s (retry after %.0fs)", self.provider, path, retry_after)

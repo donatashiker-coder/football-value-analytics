@@ -32,7 +32,7 @@ class TheOddsApiProvider(OddsDataProvider):
         if not s.odds_api_key:
             raise ProviderNotConfigured("ODDS_API_KEY is not set")
         self.key = s.odds_api_key
-        self.http = CachedHttpClient(self.name, "https://api.the-odds-api.com/v4", default_ttl=900, session_factory=session_factory)
+        self.http = CachedHttpClient(self.name, "https://api.the-odds-api.com/v4", default_ttl=900, session_factory=session_factory, quota_headers=("x-requests-remaining", "x-requests-used"))
         self.regions = "uk,eu"
 
     async def get_bookmakers(self) -> list[dict]:
