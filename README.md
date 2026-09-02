@@ -1,5 +1,9 @@
 # Football Value Analytics
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/donatashiker-coder/football-value-analytics)
+
+Lietuviška paleidimo instrukcija: [docs/DEPLOY_LT.md](docs/DEPLOY_LT.md).
+
 A football analytics and **value-betting research** platform. Every day it ingests fixtures, results, per-match
 statistics, team news and bookmaker odds; computes model probabilities with statistical models (Poisson /
 Dixon-Coles for goals, Negative-Binomial for corners, Elo for strength); compares them with
