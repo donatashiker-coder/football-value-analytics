@@ -1,0 +1,42 @@
+# Render Blueprint - one free web service running API + built frontend + in-process scheduler.
+# Database: external Postgres (Neon free tier); DATABASE_URL and provider keys are entered in the Render
+# dashboard when the Blueprint is created (sync: false = never stored in the repo).
+services:
+  - type: web
+    name: football-value-analytics
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./docker/Dockerfile.render
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_MODE
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: TIMEZONE
+        value: Europe/London
+      - key: CACHE_DIR
+        value: /app/data/cache
+      - key: SCHEDULER_ENABLED
+        value: "true"
+      - key: SCHEDULER_IN_APP
+        value: "true"
+      - key: ODDS_REFRESH_MINUTES
+        value: "720"
+      - key: FOOTBALL_PROVIDER
+        value: football_data
+      - key: ODDS_PROVIDER
+        value: the_odds_api
+      - key: DATABASE_URL
+        sync: false
+      - key: FOOTBALL_DATA_API_KEY
+        sync: false
+      - key: ODDS_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
