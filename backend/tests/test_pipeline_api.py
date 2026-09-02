@@ -189,3 +189,12 @@ def test_provider_quota_is_recorded_from_response_headers(client, db_session_fac
         assert "_provider_quota" not in all_settings(db)  # internal state is not an editable setting
     odds = next(p for p in client.get("/api/data-sources").json()["providers"] if p["key"] == "the_odds_api")
     assert odds["quota"]["remaining"] == 437 and odds["quota"]["used"] == 63
+
+
+def test_provider_errors_never_contain_api_keys():
+    from app.providers.http import redact_secrets
+
+    msg = "Client error '401 Unauthorized' for url 'https://api.the-odds-api.com/v4/sports/x/odds?apiKey=d55dcbb7571243fc84bd6e577cfa2226&regions=uk%2Ceu&markets=h2h'"
+    out = redact_secrets(msg)
+    assert "d55dcbb7" not in out and "apiKey=***&regions=uk" in out
+    assert redact_secrets(None) is None

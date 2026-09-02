@@ -12,6 +12,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -25,6 +26,14 @@ from app.providers.base import ProviderUnavailable
 from app.utils.logging import get_logger
 
 log = get_logger(__name__)
+
+
+_SECRET_PARAM = re.compile(r"(?i)\b(apiKey|api_key|apikey|key|token|access_token)=[^&\s'\"]+")
+
+
+def redact_secrets(text: str | None) -> str | None:
+    """Mask API keys that httpx error messages embed in the request URL before anything is stored or shown."""
+    return None if text is None else _SECRET_PARAM.sub(lambda m: f"{m.group(1)}=***", text)
 
 
 class RateLimited(Exception):
@@ -82,7 +91,7 @@ class CachedHttpClient:
             from app.models import ApiRequest
 
             with self.session_factory() as db:
-                db.add(ApiRequest(provider=self.provider, endpoint=endpoint[:200], status_code=status, duration_ms=duration_ms, cached=cached, error=error))
+                db.add(ApiRequest(provider=self.provider, endpoint=endpoint[:200], status_code=status, duration_ms=duration_ms, cached=cached, error=redact_secrets(error)))
                 db.commit()
         except Exception as exc:  # pragma: no cover - logging must never break a request
             log.debug("api request log failed: %s", exc)
@@ -123,7 +132,7 @@ class CachedHttpClient:
             raise ProviderUnavailable(f"{self.provider} rate limited; retry after {exc.retry_after}s") from exc
         except (httpx.HTTPError, httpx.InvalidURL) as exc:
             self._log_request(path, None, 0.0, False, str(exc)[:200])
-            raise ProviderUnavailable(f"{self.provider}: {exc}") from exc
+            raise ProviderUnavailable(f"{self.provider}: {redact_secrets(str(exc))}") from exc
         if use_cache and ttl > 0:
             self._write_cache(path, params, data)
         return data

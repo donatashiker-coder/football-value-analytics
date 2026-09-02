@@ -48,7 +48,9 @@ def status(db: Session = Depends(get_db)):
 
 def _last_error(db: Session, provider: str) -> str | None:
     """Most recent provider error text (status body excerpt; endpoints are logged without query params, so no keys)."""
-    return db.scalar(select(ApiRequest.error).where(ApiRequest.provider == provider, ApiRequest.error.isnot(None)).order_by(ApiRequest.created_at.desc()).limit(1))
+    from app.providers.http import redact_secrets  # rows written before redaction existed are masked on read
+
+    return redact_secrets(db.scalar(select(ApiRequest.error).where(ApiRequest.provider == provider, ApiRequest.error.isnot(None)).order_by(ApiRequest.created_at.desc()).limit(1)))
 
 
 @router.get("/data-health")
